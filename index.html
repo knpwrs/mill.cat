@@ -75,7 +75,7 @@
   .speed-display { font-size: 36px; font-weight: 700; text-align: center;
     font-variant-numeric: tabular-nums; padding: 6px 0; }
   .speed-display .unit { font-size: 14px; color: var(--muted); font-weight: 400; margin-left: 4px; }
-  .quick-speeds { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 10px; }
+  .quick-speeds { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
   .quick-speeds button { padding: 8px 0; font-size: 13px; }
   details { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 8px; }
   details summary { cursor: pointer; color: var(--muted); font-size: 12px;
@@ -141,9 +141,9 @@
   <section>
     <h2>Belt</h2>
     <div class="speed-display">
-      <span id="targetSpeed">1.2</span><span id="targetSpeedUnit" class="unit">mph target</span>
+      <span id="targetSpeed">1.0</span><span id="targetSpeedUnit" class="unit">mph target</span>
     </div>
-    <input type="range" id="speedSlider" min="0" max="3.7" step="0.1" value="1.2" disabled />
+    <input type="range" id="speedSlider" min="0" max="3.7" step="0.1" value="1.0" disabled />
     <div class="quick-speeds" id="quickSpeeds"></div>
     <div class="row" style="margin-top: 14px;">
       <button id="btnStart" class="primary" disabled>Start</button>
@@ -175,7 +175,7 @@
       </label>
       <label class="field">
         <span>Start speed</span>
-        <input type="number" id="prefStartSpeed" min="0.3" max="3.7" step="0.1" value="1.2" />
+        <input type="number" id="prefStartSpeed" min="0.3" max="3.7" step="0.1" value="1.0" />
         <span id="prefStartSpeedUnit" style="min-width:auto;">mph</span>
         <button id="setStartSpeed">Set</button>
       </label>
@@ -359,13 +359,15 @@ class Pad {
 const $ = (id) => document.getElementById(id);
 const pad = new Pad();
 const KM_PER_MILE = 1.609344;
+const MAX_SPEED_TENTHS = 60;
+const QUICK_SPEEDS_MPH = [0.5, 1, 1.5, 2, 2.5, 3, 3.5];
 let pollTimer = null;
 let connected = false;
-let lastTargetTenths = 20; // 2.0 km/h
+let lastTargetTenths = 16; // 1.0 mph, rounded to the nearest 0.1 km/h
 let latestSpeedKmh = 0;
 let latestDistanceKm = 0;
 let prefMaxSpeedTenths = 60;
-let prefStartSpeedTenths = 20;
+let prefStartSpeedTenths = 16;
 let unitSystem = 'mph';
 
 if (!navigator.bluetooth) {
@@ -398,7 +400,7 @@ function distanceForDisplay(km) {
 
 function displaySpeedToTenths(value) {
   const kmh = unitSystem === 'mph' ? value * KM_PER_MILE : value;
-  return Math.max(0, Math.min(60, Math.round(kmh * 10)));
+  return Math.max(0, Math.min(MAX_SPEED_TENTHS, Math.round(kmh * 10)));
 }
 
 function formatSpeed(kmh) {
@@ -408,12 +410,15 @@ function formatSpeed(kmh) {
 function renderQuickSpeeds() {
   const quick = $('quickSpeeds');
   quick.innerHTML = '';
-  for (let kmh = 1; kmh <= 6; kmh++) {
+  for (const mph of QUICK_SPEEDS_MPH) {
+    const requestedTenths = Math.round(mph * KM_PER_MILE * 10);
+    const label = unitSystem === 'mph' ? mph.toFixed(1) : (mph * KM_PER_MILE).toFixed(1);
+    const unitLabel = unitSystem === 'mph' ? 'miles per hour' : 'kilometres per hour';
     const b = document.createElement('button');
-    b.textContent = formatSpeed(kmh);
+    b.textContent = label;
     b.disabled = !connected;
-    b.setAttribute('aria-label', `${formatSpeed(kmh)} ${unitSystem === 'mph' ? 'miles per hour' : 'kilometres per hour'}`);
-    b.onclick = () => setTargetSpeed(kmh * 10);
+    b.setAttribute('aria-label', `${label} ${unitLabel}`);
+    b.onclick = () => setTargetSpeed(requestedTenths);
     quick.appendChild(b);
   }
 }
@@ -506,7 +511,7 @@ function updateBeltDot(state) {
 }
 
 function setTargetSpeed(tenths) {
-  tenths = Math.max(0, Math.min(60, Math.round(tenths)));
+  tenths = Math.max(0, Math.min(MAX_SPEED_TENTHS, Math.round(tenths)));
   lastTargetTenths = tenths;
   renderTargetSpeed();
   if (connected) pad.send(CMD.setSpeed(tenths));
