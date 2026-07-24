@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+<title>WalkingPad Control</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #181b22;
+    --panel2: #1f232c;
+    --border: #2a2f3a;
+    --text: #e6e9ef;
+    --muted: #8b93a3;
+    --accent: #5ad1a4;
+    --accent-dim: #2e8567;
+    --warn: #f0a347;
+    --danger: #e26a6a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.4 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; }
+  body { min-height: 100vh; display: flex; flex-direction: column; }
+  header { display: flex; align-items: center; gap: 12px; padding: 12px 20px;
+    background: var(--panel); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 16px; font-weight: 600; margin: 0; flex: 1; }
+  .pill { font-size: 12px; padding: 4px 10px; border-radius: 999px;
+    background: var(--panel2); border: 1px solid var(--border); color: var(--muted); }
+  .pill.ok { color: var(--accent); border-color: var(--accent-dim); }
+  .pill.err { color: var(--danger); border-color: #5a2929; }
+  main { flex: 1; padding: 20px; max-width: 960px; margin: 0 auto; width: 100%;
+    display: grid; gap: 20px; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 720px) { main { grid-template-columns: 1fr; } }
+  section { background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px; }
+  section h2 { margin: 0 0 14px; font-size: 13px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  .stats { grid-column: 1 / -1; display: grid; gap: 12px;
+    grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .stat { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px; text-align: center; }
+  .stat .label { font-size: 11px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.08em; margin-bottom: 6px; }
+  .stat .value { font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stat .unit { font-size: 12px; color: var(--muted); margin-left: 3px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .row + .row { margin-top: 10px; }
+  button { font: inherit; cursor: pointer; padding: 9px 14px; border-radius: 8px;
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    transition: background 0.1s; }
+  button:hover:not(:disabled) { background: #262b35; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.primary { background: var(--accent-dim); border-color: var(--accent-dim); color: #fff; }
+  button.primary:hover:not(:disabled) { background: #379e7a; }
+  button.danger { background: #5a2929; border-color: #6a3232; color: #fff; }
+  button.danger:hover:not(:disabled) { background: #6e3535; }
+  button.active { background: var(--accent-dim); border-color: var(--accent-dim); color: #fff; }
+  input[type=range] { flex: 1; accent-color: var(--accent); }
+  input[type=number], select { background: var(--panel2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font: inherit; }
+  label.field { display: flex; align-items: center; gap: 10px; font-size: 13px;
+    color: var(--muted); margin: 6px 0; }
+  label.field span { min-width: 110px; }
+  label.toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+    font-size: 13px; color: var(--muted); }
+  label.toggle input { accent-color: var(--accent); }
+  .speed-display { font-size: 36px; font-weight: 700; text-align: center;
+    font-variant-numeric: tabular-nums; padding: 6px 0; }
+  .speed-display .unit { font-size: 14px; color: var(--muted); font-weight: 400; margin-left: 4px; }
+  .quick-speeds { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 10px; }
+  .quick-speeds button { padding: 8px 0; font-size: 13px; }
+  details { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 8px; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 12px;
+    text-transform: uppercase; letter-spacing: 0.08em; outline: none; }
+  details[open] summary { margin-bottom: 10px; }
+  #log { grid-column: 1 / -1; background: #0a0c10; border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px; height: 180px; overflow-y: auto;
+    font: 12px/1.5 ui-monospace, "SF Mono", Menlo, monospace; color: #c0c8d8; }
+  #log .e { color: var(--danger); }
+  #log .w { color: var(--warn); }
+  #log .s { color: var(--accent); }
+  #log .t { color: var(--muted); }
+  #log .rx { color: #6fa3ce; }
+  #log .tx { color: #b69cff; }
+  .unsupported { background: #2b1b13; border: 1px solid #6e4421; color: #f0a347;
+    padding: 18px; border-radius: 12px; margin: 20px; text-align: center; }
+  .belt-indicator { display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+    background: #555; margin-right: 6px; vertical-align: middle; }
+  .belt-indicator.running { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .belt-indicator.idle { background: var(--muted); }
+  .belt-indicator.standby { background: var(--warn); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>😸 WalkingPad Control</h1>
+  <span id="protocol" class="pill">—</span>
+  <span id="device" class="pill">no device</span>
+  <span id="status" class="pill">disconnected</span>
+  <button id="btnConnect" class="primary">Connect</button>
+  <button id="btnDisconnect" disabled>Disconnect</button>
+</header>
+
+<div id="noBluetooth" class="unsupported" hidden>
+  Your browser doesn't support Web Bluetooth. Use Chrome or Edge on macOS, Windows, Linux, ChromeOS, or Android.
+</div>
+
+<main>
+  <section class="stats">
+    <div class="stat">
+      <div class="label"><span id="beltDot" class="belt-indicator idle"></span>Speed</div>
+      <div class="value"><span id="speed">0.0</span><span class="unit">km/h</span></div>
+    </div>
+    <div class="stat">
+      <div class="label">Time</div>
+      <div class="value" id="time">00:00</div>
+    </div>
+    <div class="stat">
+      <div class="label">Distance</div>
+      <div class="value"><span id="distance">0.00</span><span class="unit">km</span></div>
+    </div>
+    <div class="stat">
+      <div class="label">Steps</div>
+      <div class="value" id="steps">0</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Belt</h2>
+    <div class="speed-display">
+      <span id="targetSpeed">2.0</span><span class="unit">km/h target</span>
+    </div>
+    <input type="range" id="speedSlider" min="0" max="60" step="1" value="20" disabled />
+    <div class="quick-speeds" id="quickSpeeds"></div>
+    <div class="row" style="margin-top: 14px;">
+      <button id="btnStart" class="primary" disabled>Start</button>
+      <button id="btnStop" class="danger" disabled>Stop</button>
+      <button id="btnSpeedDown" disabled>−0.1</button>
+      <button id="btnSpeedUp" disabled>+0.1</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Mode</h2>
+    <div class="row">
+      <button id="modeAuto" disabled>Auto</button>
+      <button id="modeManual" disabled>Manual</button>
+      <button id="modeStandby" disabled>Standby</button>
+    </div>
+    <p style="color: var(--muted); font-size: 12px; margin: 12px 0 0;">
+      <strong>Auto</strong>: belt responds to weight sensor. <strong>Manual</strong>: speed controlled here.
+      <strong>Standby</strong>: low-power sleep.
+    </p>
+
+    <details>
+      <summary>Preferences</summary>
+      <label class="field">
+        <span>Max speed</span>
+        <input type="number" id="prefMaxSpeed" min="1" max="6" step="0.1" value="6" />
+        <span style="min-width:auto;">km/h</span>
+        <button id="setMaxSpeed">Set</button>
+      </label>
+      <label class="field">
+        <span>Start speed</span>
+        <input type="number" id="prefStartSpeed" min="0.5" max="6" step="0.1" value="2" />
+        <span style="min-width:auto;">km/h</span>
+        <button id="setStartSpeed">Set</button>
+      </label>
+      <label class="field">
+        <span>Sensitivity</span>
+        <select id="prefSensitivity">
+          <option value="1">High</option>
+          <option value="2" selected>Medium</option>
+          <option value="3">Low</option>
+        </select>
+        <button id="setSensitivity">Set</button>
+      </label>
+      <label class="field">
+        <span>Units</span>
+        <select id="prefUnits">
+          <option value="0" selected>Kilometres</option>
+          <option value="1">Miles</option>
+        </select>
+        <button id="setUnits">Set</button>
+      </label>
+      <div class="row" style="margin-top: 10px;">
+        <label class="toggle"><input type="checkbox" id="prefChildLock" /> Child lock</label>
+        <label class="toggle"><input type="checkbox" id="prefAutoStart" /> Auto-start (stand-on)</label>
+      </div>
+    </details>
+  </section>
+
+  <section id="logSection" style="grid-column: 1 / -1;">
+    <h2 style="display: flex; align-items: center; justify-content: space-between;">
+      Log
+      <button id="clearLog" style="padding: 3px 8px; font-size: 11px; text-transform: none; letter-spacing: 0;">Clear</button>
+    </h2>
+    <div id="log"></div>
+  </section>
+</main>
+
+<script type="module">
+// ============================================================
+//  Protocol: Wilink (0xFE00) — works on every WalkingPad/KS pad
+// ============================================================
+const SVC_WILINK = 0xfe00;
+const CHR_NOTIFY = 0xfe01;
+const CHR_WRITE  = 0xfe02;
+const SVC_FTMS   = 0x1826;
+
+const MODE = { AUTO: 0, MANUAL: 1, STANDBY: 2 };
+
+const checksum = (bytes) => bytes.reduce((a, b) => (a + b) & 0xff, 0);
+const frame = (type, op, ...payload) => {
+  const body = [type, op, ...payload];
+  return new Uint8Array([0xF7, ...body, checksum(body), 0xFD]);
+};
+
+const CMD = {
+  status:      ()       => frame(0xA2, 0x00, 0x00),
+  setSpeed:    (tenths) => frame(0xA2, 0x01, Math.max(0, Math.min(60, tenths))),
+  setMode:     (m)      => frame(0xA2, 0x02, m),
+  setIncline:  (tenths) => frame(0xA2, 0x03, Math.max(0, Math.min(180, tenths))),
+  start:       ()       => frame(0xA2, 0x04, 0x01),
+  stop:        ()       => frame(0xA2, 0x01, 0x00),
+  pause:       ()       => frame(0xA2, 0x05, 0x01),
+  syncHr:      (bpm)    => frame(0xA2, 0x06, bpm & 0xff),
+  childLock:   (on)     => frame(0xA6, 0x09, on ? 1 : 0),
+  maxSpeed:    (tenths) => frame(0xA6, 0x03, tenths),
+  startSpeed:  (tenths) => frame(0xA6, 0x04, tenths),
+  autoStart:   (on)     => frame(0xA6, 0x05, on ? 1 : 0),
+  sensitivity: (s)      => frame(0xA6, 0x06, s),
+  display:     (mask)   => frame(0xA6, 0x07, mask & 0x1f),
+  units:       (mi)     => frame(0xA6, 0x08, mi ? 1 : 0),
+};
+
+const u24 = (b, o) => (b[o] << 16) | (b[o + 1] << 8) | b[o + 2];
+
+function parseFrame(buf) {
+  if (buf.length < 6 || buf[0] !== 0xF8 || buf[buf.length - 1] !== 0xFD) return null;
+  const type = buf[1];
+  if (type === 0xA2 && buf.length >= 19) {
+    return {
+      kind: 'status',
+      beltState: buf[2],
+      speed: buf[3] / 10,
+      mode: buf[4],
+      time: u24(buf, 5),
+      distance: u24(buf, 8) / 100,
+      steps: u24(buf, 11),
+      appSpeed: buf[14] / 30,
+      button: buf[16],
+    };
+  }
+  if (type === 0xA7) {
+    return {
+      kind: 'lastSession',
+      time: u24(buf, 8),
+      distance: u24(buf, 11) / 100,
+      steps: u24(buf, 14),
+    };
+  }
+  return { kind: 'other', type, raw: Array.from(buf) };
+}
+
+// ============================================================
+//  Web Bluetooth driver
+// ============================================================
+class Pad {
+  constructor() {
+    this.device = null;
+    this.write = null;
+    this.notify = null;
+    this.rx = new Uint8Array(0);
+    this.txQueue = Promise.resolve();
+    this.listeners = new Set();
+  }
+  on(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
+  emit(ev) { for (const fn of this.listeners) { try { fn(ev); } catch (e) { console.error(e); } } }
+
+  async connect() {
+    if (!navigator.bluetooth) throw new Error('Web Bluetooth not supported');
+    this.device = await navigator.bluetooth.requestDevice({
+      filters: [
+        { services: [SVC_WILINK] },
+        { services: [SVC_FTMS] },
+        { namePrefix: 'KS-' },
+        { namePrefix: 'WalkingPad' },
+      ],
+      optionalServices: [SVC_WILINK, SVC_FTMS, 'device_information', 'battery_service'],
+    });
+    this.emit({ kind: 'device', name: this.device.name || '(unnamed)', id: this.device.id });
+    this.device.addEventListener('gattserverdisconnected', () => {
+      this.emit({ kind: 'disconnected' });
+    });
+    const server = await this.device.gatt.connect();
+    const service = await server.getPrimaryService(SVC_WILINK);
+    this.write  = await service.getCharacteristic(CHR_WRITE);
+    this.notify = await service.getCharacteristic(CHR_NOTIFY);
+    await this.notify.startNotifications();
+    this.notify.addEventListener('characteristicvaluechanged', (e) => {
+      const v = new Uint8Array(e.target.value.buffer);
+      this.emit({ kind: 'raw', dir: 'rx', bytes: Array.from(v) });
+      this._consume(v);
+    });
+    this.emit({ kind: 'connected', protocol: 'wilink' });
+  }
+
+  _consume(chunk) {
+    const merged = new Uint8Array(this.rx.length + chunk.length);
+    merged.set(this.rx, 0); merged.set(chunk, this.rx.length);
+    this.rx = merged;
+    let i = 0;
+    while (i < this.rx.length) {
+      const start = this.rx.indexOf(0xF8, i);
+      if (start < 0) { this.rx = new Uint8Array(0); return; }
+      const end = this.rx.indexOf(0xFD, start);
+      if (end < 0) { this.rx = this.rx.slice(start); return; }
+      const f = this.rx.slice(start, end + 1);
+      const ev = parseFrame(f);
+      if (ev) this.emit(ev);
+      i = end + 1;
+    }
+    this.rx = new Uint8Array(0);
+  }
+
+  send(bytes) {
+    this.txQueue = this.txQueue.then(async () => {
+      if (!this.write) throw new Error('not connected');
+      this.emit({ kind: 'raw', dir: 'tx', bytes: Array.from(bytes) });
+      try { await this.write.writeValueWithoutResponse(bytes); }
+      catch { await this.write.writeValue(bytes); }
+      await new Promise((r) => setTimeout(r, 35));
+    }).catch((e) => { this.emit({ kind: 'error', error: e }); });
+    return this.txQueue;
+  }
+
+  async disconnect() {
+    try { if (this.device?.gatt.connected) this.device.gatt.disconnect(); } catch {}
+  }
+}
+
+// ============================================================
+//  UI
+// ============================================================
+const $ = (id) => document.getElementById(id);
+const pad = new Pad();
+let pollTimer = null;
+let connected = false;
+let lastTargetTenths = 20; // 2.0 km/h
+
+if (!navigator.bluetooth) {
+  $('noBluetooth').hidden = false;
+  $('btnConnect').disabled = true;
+}
+
+function log(msg, cls = '') {
+  const line = document.createElement('div');
+  const ts = new Date().toLocaleTimeString();
+  line.innerHTML = `<span class="t">[${ts}]</span> <span class="${cls}">${msg}</span>`;
+  const el = $('log');
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+
+function fmtTime(s) {
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  return h ? `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`
+           : `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+
+function setConnected(on) {
+  connected = on;
+  $('status').textContent = on ? 'connected' : 'disconnected';
+  $('status').className = 'pill ' + (on ? 'ok' : '');
+  $('btnConnect').disabled = on;
+  $('btnDisconnect').disabled = !on;
+  document.querySelectorAll('main button, main input').forEach(el => {
+    if (el.id === 'clearLog') return;
+    el.disabled = !on;
+  });
+  if (!on) {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    $('protocol').textContent = '—';
+    $('protocol').className = 'pill';
+    $('device').textContent = 'no device';
+  }
+}
+
+function highlightMode(m) {
+  $('modeAuto').classList.toggle('active', m === MODE.AUTO);
+  $('modeManual').classList.toggle('active', m === MODE.MANUAL);
+  $('modeStandby').classList.toggle('active', m === MODE.STANDBY);
+}
+
+function updateBeltDot(state) {
+  const dot = $('beltDot');
+  dot.classList.remove('idle', 'running', 'standby');
+  if (state === 1) dot.classList.add('running');
+  else if (state === 5) dot.classList.add('standby');
+  else dot.classList.add('idle');
+}
+
+// quick-speed buttons (1.0 → 6.0 km/h)
+const quick = $('quickSpeeds');
+for (let i = 1; i <= 6; i++) {
+  const b = document.createElement('button');
+  b.textContent = `${i.toFixed(1)}`;
+  b.disabled = true;
+  b.onclick = () => setTargetSpeed(i * 10);
+  quick.appendChild(b);
+}
+
+function setTargetSpeed(tenths) {
+  tenths = Math.max(0, Math.min(60, Math.round(tenths)));
+  lastTargetTenths = tenths;
+  $('speedSlider').value = tenths;
+  $('targetSpeed').textContent = (tenths / 10).toFixed(1);
+  if (connected) pad.send(CMD.setSpeed(tenths));
+}
+
+$('speedSlider').addEventListener('input', (e) => {
+  const t = Number(e.target.value);
+  $('targetSpeed').textContent = (t / 10).toFixed(1);
+});
+$('speedSlider').addEventListener('change', (e) => setTargetSpeed(Number(e.target.value)));
+$('btnSpeedUp').onclick   = () => setTargetSpeed(lastTargetTenths + 1);
+$('btnSpeedDown').onclick = () => setTargetSpeed(lastTargetTenths - 1);
+
+$('btnStart').onclick = async () => {
+  await pad.send(CMD.setMode(MODE.MANUAL));
+  await pad.send(CMD.start());
+  if (lastTargetTenths > 0) await pad.send(CMD.setSpeed(lastTargetTenths));
+  log(`▶ start @ ${(lastTargetTenths / 10).toFixed(1)} km/h`, 's');
+};
+$('btnStop').onclick = async () => { await pad.send(CMD.stop()); log('■ stop', 's'); };
+
+$('modeAuto').onclick    = () => pad.send(CMD.setMode(MODE.AUTO));
+$('modeManual').onclick  = () => pad.send(CMD.setMode(MODE.MANUAL));
+$('modeStandby').onclick = () => pad.send(CMD.setMode(MODE.STANDBY));
+
+$('setMaxSpeed').onclick    = () => pad.send(CMD.maxSpeed(Math.round(+$('prefMaxSpeed').value * 10)));
+$('setStartSpeed').onclick  = () => pad.send(CMD.startSpeed(Math.round(+$('prefStartSpeed').value * 10)));
+$('setSensitivity').onclick = () => pad.send(CMD.sensitivity(+$('prefSensitivity').value));
+$('setUnits').onclick       = () => pad.send(CMD.units(+$('prefUnits').value));
+$('prefChildLock').onchange = (e) => pad.send(CMD.childLock(e.target.checked));
+$('prefAutoStart').onchange = (e) => pad.send(CMD.autoStart(e.target.checked));
+
+$('btnConnect').onclick = async () => {
+  try {
+    log('requesting device…');
+    await pad.connect();
+  } catch (e) {
+    log(`connect failed: ${e.message}`, 'e');
+  }
+};
+$('btnDisconnect').onclick = async () => { await pad.disconnect(); };
+$('clearLog').onclick = () => { $('log').innerHTML = ''; };
+
+pad.on((ev) => {
+  switch (ev.kind) {
+    case 'device':
+      $('device').textContent = ev.name;
+      break;
+    case 'connected':
+      $('protocol').textContent = ev.protocol;
+      $('protocol').className = 'pill ok';
+      setConnected(true);
+      log(`connected via ${ev.protocol}`, 's');
+      pollTimer = setInterval(() => pad.send(CMD.status()), 1000);
+      pad.send(CMD.status());
+      break;
+    case 'disconnected':
+      setConnected(false);
+      log('disconnected', 'w');
+      break;
+    case 'status':
+      $('speed').textContent = ev.speed.toFixed(1);
+      $('time').textContent = fmtTime(ev.time);
+      $('distance').textContent = ev.distance.toFixed(2);
+      $('steps').textContent = ev.steps.toLocaleString();
+      highlightMode(ev.mode);
+      updateBeltDot(ev.beltState);
+      break;
+    case 'lastSession':
+      log(`session: ${fmtTime(ev.time)} / ${ev.distance.toFixed(2)} km / ${ev.steps} steps`, 's');
+      break;
+    case 'raw': {
+      const hex = ev.bytes.map((b) => b.toString(16).padStart(2, '0')).join(' ');
+      log(`${ev.dir.toUpperCase()} ${hex}`, ev.dir);
+      break;
+    }
+    case 'error':
+      log(`error: ${ev.error.message || ev.error}`, 'e');
+      break;
+  }
+});
+
+setConnected(false);
+log('ready. click Connect.');
+</script>
+
+</body>
+</html>
