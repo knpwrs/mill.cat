@@ -22,7 +22,7 @@
   html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
     font: 14px/1.4 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; }
   body { min-height: 100vh; display: flex; flex-direction: column; }
-  header { display: flex; align-items: center; gap: 12px; padding: 12px 20px;
+  header { display: flex; align-items: center; gap: 12px; padding: 12px 20px; flex-wrap: wrap;
     background: var(--panel); border-bottom: 1px solid var(--border); }
   header h1 { font-size: 16px; font-weight: 600; margin: 0; flex: 1; }
   .pill { font-size: 12px; padding: 4px 10px; border-radius: 999px;
@@ -57,6 +57,12 @@
   button.danger { background: #5a2929; border-color: #6a3232; color: #fff; }
   button.danger:hover:not(:disabled) { background: #6e3535; }
   button.active { background: var(--accent-dim); border-color: var(--accent-dim); color: #fff; }
+  .unit-toggle { display: inline-flex; padding: 2px; border-radius: 9px;
+    background: var(--panel2); border: 1px solid var(--border); }
+  .unit-toggle button { padding: 5px 9px; border: 0; border-radius: 6px;
+    background: transparent; color: var(--muted); font-size: 12px; }
+  .unit-toggle button:hover { background: #262b35; }
+  .unit-toggle button[aria-pressed="true"] { background: var(--accent-dim); color: #fff; }
   input[type=range] { flex: 1; accent-color: var(--accent); }
   input[type=number], select { background: var(--panel2); color: var(--text);
     border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font: inherit; }
@@ -100,6 +106,10 @@
   <span id="protocol" class="pill">—</span>
   <span id="device" class="pill">no device</span>
   <span id="status" class="pill">disconnected</span>
+  <div class="unit-toggle" role="group" aria-label="Speed and distance units">
+    <button id="unitMph" type="button" aria-pressed="true">mph</button>
+    <button id="unitKmh" type="button" aria-pressed="false">km/h</button>
+  </div>
   <button id="btnConnect" class="primary">Connect</button>
   <button id="btnDisconnect" disabled>Disconnect</button>
 </header>
@@ -112,7 +122,7 @@
   <section class="stats">
     <div class="stat">
       <div class="label"><span id="beltDot" class="belt-indicator idle"></span>Speed</div>
-      <div class="value"><span id="speed">0.0</span><span class="unit">km/h</span></div>
+      <div class="value"><span id="speed">0.0</span><span id="speedUnit" class="unit">mph</span></div>
     </div>
     <div class="stat">
       <div class="label">Time</div>
@@ -120,7 +130,7 @@
     </div>
     <div class="stat">
       <div class="label">Distance</div>
-      <div class="value"><span id="distance">0.00</span><span class="unit">km</span></div>
+      <div class="value"><span id="distance">0.00</span><span id="distanceUnit" class="unit">mi</span></div>
     </div>
     <div class="stat">
       <div class="label">Steps</div>
@@ -131,15 +141,15 @@
   <section>
     <h2>Belt</h2>
     <div class="speed-display">
-      <span id="targetSpeed">2.0</span><span class="unit">km/h target</span>
+      <span id="targetSpeed">1.2</span><span id="targetSpeedUnit" class="unit">mph target</span>
     </div>
-    <input type="range" id="speedSlider" min="0" max="60" step="1" value="20" disabled />
+    <input type="range" id="speedSlider" min="0" max="3.7" step="0.1" value="1.2" disabled />
     <div class="quick-speeds" id="quickSpeeds"></div>
     <div class="row" style="margin-top: 14px;">
       <button id="btnStart" class="primary" disabled>Start</button>
       <button id="btnStop" class="danger" disabled>Stop</button>
-      <button id="btnSpeedDown" disabled>−0.1</button>
-      <button id="btnSpeedUp" disabled>+0.1</button>
+      <button id="btnSpeedDown" disabled>−0.1 mph</button>
+      <button id="btnSpeedUp" disabled>+0.1 mph</button>
     </div>
   </section>
 
@@ -159,14 +169,14 @@
       <summary>Preferences</summary>
       <label class="field">
         <span>Max speed</span>
-        <input type="number" id="prefMaxSpeed" min="1" max="6" step="0.1" value="6" />
-        <span style="min-width:auto;">km/h</span>
+        <input type="number" id="prefMaxSpeed" min="0.6" max="3.7" step="0.1" value="3.7" />
+        <span id="prefMaxSpeedUnit" style="min-width:auto;">mph</span>
         <button id="setMaxSpeed">Set</button>
       </label>
       <label class="field">
         <span>Start speed</span>
-        <input type="number" id="prefStartSpeed" min="0.5" max="6" step="0.1" value="2" />
-        <span style="min-width:auto;">km/h</span>
+        <input type="number" id="prefStartSpeed" min="0.3" max="3.7" step="0.1" value="1.2" />
+        <span id="prefStartSpeedUnit" style="min-width:auto;">mph</span>
         <button id="setStartSpeed">Set</button>
       </label>
       <label class="field">
@@ -179,10 +189,10 @@
         <button id="setSensitivity">Set</button>
       </label>
       <label class="field">
-        <span>Units</span>
+        <span>Treadmill display</span>
         <select id="prefUnits">
-          <option value="0" selected>Kilometres</option>
-          <option value="1">Miles</option>
+          <option value="0">Kilometres</option>
+          <option value="1" selected>Miles</option>
         </select>
         <button id="setUnits">Set</button>
       </label>
@@ -348,9 +358,20 @@ class Pad {
 // ============================================================
 const $ = (id) => document.getElementById(id);
 const pad = new Pad();
+const KM_PER_MILE = 1.609344;
 let pollTimer = null;
 let connected = false;
 let lastTargetTenths = 20; // 2.0 km/h
+let latestSpeedKmh = 0;
+let latestDistanceKm = 0;
+let prefMaxSpeedTenths = 60;
+let prefStartSpeedTenths = 20;
+let unitSystem = 'mph';
+
+try {
+  const savedUnits = localStorage.getItem('walkingpad-units');
+  if (savedUnits === 'mph' || savedUnits === 'kmh') unitSystem = savedUnits;
+} catch {}
 
 if (!navigator.bluetooth) {
   $('noBluetooth').hidden = false;
@@ -370,6 +391,92 @@ function fmtTime(s) {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
   return h ? `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`
            : `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+
+function speedForDisplay(kmh) {
+  return unitSystem === 'mph' ? kmh / KM_PER_MILE : kmh;
+}
+
+function distanceForDisplay(km) {
+  return unitSystem === 'mph' ? km / KM_PER_MILE : km;
+}
+
+function displaySpeedToTenths(value) {
+  const kmh = unitSystem === 'mph' ? value * KM_PER_MILE : value;
+  return Math.max(0, Math.min(60, Math.round(kmh * 10)));
+}
+
+function formatSpeed(kmh) {
+  return speedForDisplay(kmh).toFixed(1);
+}
+
+function renderQuickSpeeds() {
+  const quick = $('quickSpeeds');
+  quick.innerHTML = '';
+  for (let kmh = 1; kmh <= 6; kmh++) {
+    const b = document.createElement('button');
+    b.textContent = formatSpeed(kmh);
+    b.disabled = !connected;
+    b.setAttribute('aria-label', `${formatSpeed(kmh)} ${unitSystem === 'mph' ? 'miles per hour' : 'kilometres per hour'}`);
+    b.onclick = () => setTargetSpeed(kmh * 10);
+    quick.appendChild(b);
+  }
+}
+
+function renderTelemetry() {
+  $('speed').textContent = formatSpeed(latestSpeedKmh);
+  $('distance').textContent = distanceForDisplay(latestDistanceKm).toFixed(2);
+}
+
+function renderTargetSpeed() {
+  const displaySpeed = formatSpeed(lastTargetTenths / 10);
+  $('targetSpeed').textContent = displaySpeed;
+  $('speedSlider').value = displaySpeed;
+}
+
+function renderPreferenceSpeeds() {
+  const mph = unitSystem === 'mph';
+  $('prefMaxSpeed').min = mph ? '0.6' : '1';
+  $('prefMaxSpeed').max = mph ? '3.7' : '6';
+  $('prefMaxSpeed').value = formatSpeed(prefMaxSpeedTenths / 10);
+  $('prefStartSpeed').min = mph ? '0.3' : '0.5';
+  $('prefStartSpeed').max = mph ? '3.7' : '6';
+  $('prefStartSpeed').value = formatSpeed(prefStartSpeedTenths / 10);
+}
+
+function renderUnitSystem() {
+  const mph = unitSystem === 'mph';
+  const speedUnit = mph ? 'mph' : 'km/h';
+  $('unitMph').setAttribute('aria-pressed', String(mph));
+  $('unitKmh').setAttribute('aria-pressed', String(!mph));
+  $('speedUnit').textContent = speedUnit;
+  $('distanceUnit').textContent = mph ? 'mi' : 'km';
+  $('targetSpeedUnit').textContent = `${speedUnit} target`;
+  $('prefMaxSpeedUnit').textContent = speedUnit;
+  $('prefStartSpeedUnit').textContent = speedUnit;
+  $('btnSpeedDown').textContent = `−0.1 ${speedUnit}`;
+  $('btnSpeedUp').textContent = `+0.1 ${speedUnit}`;
+  $('speedSlider').max = mph ? '3.7' : '6';
+  $('speedSlider').step = '0.1';
+  renderTelemetry();
+  renderTargetSpeed();
+  renderPreferenceSpeeds();
+  renderQuickSpeeds();
+}
+
+function syncMaxSpeedPreference() {
+  prefMaxSpeedTenths = Math.max(10, displaySpeedToTenths(+$('prefMaxSpeed').value));
+}
+
+function syncStartSpeedPreference() {
+  prefStartSpeedTenths = Math.max(5, displaySpeedToTenths(+$('prefStartSpeed').value));
+}
+
+function setUnitSystem(nextUnits) {
+  if (nextUnits === unitSystem) return;
+  unitSystem = nextUnits;
+  try { localStorage.setItem('walkingpad-units', unitSystem); } catch {}
+  renderUnitSystem();
 }
 
 function setConnected(on) {
@@ -404,37 +511,31 @@ function updateBeltDot(state) {
   else dot.classList.add('idle');
 }
 
-// quick-speed buttons (1.0 → 6.0 km/h)
-const quick = $('quickSpeeds');
-for (let i = 1; i <= 6; i++) {
-  const b = document.createElement('button');
-  b.textContent = `${i.toFixed(1)}`;
-  b.disabled = true;
-  b.onclick = () => setTargetSpeed(i * 10);
-  quick.appendChild(b);
-}
-
 function setTargetSpeed(tenths) {
   tenths = Math.max(0, Math.min(60, Math.round(tenths)));
   lastTargetTenths = tenths;
-  $('speedSlider').value = tenths;
-  $('targetSpeed').textContent = (tenths / 10).toFixed(1);
+  renderTargetSpeed();
   if (connected) pad.send(CMD.setSpeed(tenths));
 }
 
 $('speedSlider').addEventListener('input', (e) => {
-  const t = Number(e.target.value);
-  $('targetSpeed').textContent = (t / 10).toFixed(1);
+  $('targetSpeed').textContent = Number(e.target.value).toFixed(1);
 });
-$('speedSlider').addEventListener('change', (e) => setTargetSpeed(Number(e.target.value)));
-$('btnSpeedUp').onclick   = () => setTargetSpeed(lastTargetTenths + 1);
-$('btnSpeedDown').onclick = () => setTargetSpeed(lastTargetTenths - 1);
+$('speedSlider').addEventListener('change', (e) => setTargetSpeed(displaySpeedToTenths(Number(e.target.value))));
+$('btnSpeedUp').onclick = () => {
+  setTargetSpeed(displaySpeedToTenths(Number(formatSpeed(lastTargetTenths / 10)) + 0.1));
+};
+$('btnSpeedDown').onclick = () => {
+  setTargetSpeed(displaySpeedToTenths(Number(formatSpeed(lastTargetTenths / 10)) - 0.1));
+};
+$('unitMph').onclick = () => setUnitSystem('mph');
+$('unitKmh').onclick = () => setUnitSystem('kmh');
 
 $('btnStart').onclick = async () => {
   await pad.send(CMD.setMode(MODE.MANUAL));
   await pad.send(CMD.start());
   if (lastTargetTenths > 0) await pad.send(CMD.setSpeed(lastTargetTenths));
-  log(`▶ start @ ${(lastTargetTenths / 10).toFixed(1)} km/h`, 's');
+  log(`▶ start @ ${formatSpeed(lastTargetTenths / 10)} ${unitSystem === 'mph' ? 'mph' : 'km/h'}`, 's');
 };
 $('btnStop').onclick = async () => { await pad.send(CMD.stop()); log('■ stop', 's'); };
 
@@ -442,8 +543,18 @@ $('modeAuto').onclick    = () => pad.send(CMD.setMode(MODE.AUTO));
 $('modeManual').onclick  = () => pad.send(CMD.setMode(MODE.MANUAL));
 $('modeStandby').onclick = () => pad.send(CMD.setMode(MODE.STANDBY));
 
-$('setMaxSpeed').onclick    = () => pad.send(CMD.maxSpeed(Math.round(+$('prefMaxSpeed').value * 10)));
-$('setStartSpeed').onclick  = () => pad.send(CMD.startSpeed(Math.round(+$('prefStartSpeed').value * 10)));
+$('prefMaxSpeed').addEventListener('input', syncMaxSpeedPreference);
+$('prefStartSpeed').addEventListener('input', syncStartSpeedPreference);
+$('setMaxSpeed').onclick = () => {
+  syncMaxSpeedPreference();
+  renderPreferenceSpeeds();
+  pad.send(CMD.maxSpeed(prefMaxSpeedTenths));
+};
+$('setStartSpeed').onclick = () => {
+  syncStartSpeedPreference();
+  renderPreferenceSpeeds();
+  pad.send(CMD.startSpeed(prefStartSpeedTenths));
+};
 $('setSensitivity').onclick = () => pad.send(CMD.sensitivity(+$('prefSensitivity').value));
 $('setUnits').onclick       = () => pad.send(CMD.units(+$('prefUnits').value));
 $('prefChildLock').onchange = (e) => pad.send(CMD.childLock(e.target.checked));
@@ -478,15 +589,20 @@ pad.on((ev) => {
       log('disconnected', 'w');
       break;
     case 'status':
-      $('speed').textContent = ev.speed.toFixed(1);
+      latestSpeedKmh = ev.speed;
+      latestDistanceKm = ev.distance;
+      renderTelemetry();
       $('time').textContent = fmtTime(ev.time);
-      $('distance').textContent = ev.distance.toFixed(2);
       $('steps').textContent = ev.steps.toLocaleString();
       highlightMode(ev.mode);
       updateBeltDot(ev.beltState);
       break;
     case 'lastSession':
-      log(`session: ${fmtTime(ev.time)} / ${ev.distance.toFixed(2)} km / ${ev.steps} steps`, 's');
+      log(
+        `session: ${fmtTime(ev.time)} / ${distanceForDisplay(ev.distance).toFixed(2)} ` +
+        `${unitSystem === 'mph' ? 'mi' : 'km'} / ${ev.steps} steps`,
+        's'
+      );
       break;
     case 'raw': {
       const hex = ev.bytes.map((b) => b.toString(16).padStart(2, '0')).join(' ');
@@ -499,6 +615,7 @@ pad.on((ev) => {
   }
 });
 
+renderUnitSystem();
 setConnected(false);
 log('ready. click Connect.');
 </script>

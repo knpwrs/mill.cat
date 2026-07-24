@@ -10,7 +10,8 @@ The browser app connects straight to a treadmill through Web Bluetooth. It shows
 ## Features
 
 - Live speed, elapsed time, distance, and step count
-- Manual start, stop, and speed control from 0.0 to 6.0 km/h
+- mph/km/h display toggle, defaulting to mph
+- Manual start, stop, and speed control from 0.0 to 3.7 mph (0.0 to 6.0 km/h)
 - Auto, manual, and standby modes
 - Max speed, start speed, sensor sensitivity, units, child lock, and auto-start preferences
 - Raw transmit and receive logs for protocol debugging
@@ -30,7 +31,7 @@ Open <http://localhost:8000>, then:
 
 1. Turn on the WalkingPad and force-quit the KS Fit app. The treadmill accepts one Bluetooth client at a time.
 2. Click **Connect** and choose the treadmill in the browser prompt.
-3. Check the target speed before clicking **Start**. The initial target is 2.0 km/h.
+3. Check the target speed before clicking **Start**. The initial target is 1.2 mph (2.0 km/h).
 4. Use **Stop** before disconnecting.
 
 The page contains its own HTML, CSS, and JavaScript. It has no browser-side dependencies or build step.
