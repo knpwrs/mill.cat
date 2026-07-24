@@ -368,11 +368,6 @@ let prefMaxSpeedTenths = 60;
 let prefStartSpeedTenths = 20;
 let unitSystem = 'mph';
 
-try {
-  const savedUnits = localStorage.getItem('walkingpad-units');
-  if (savedUnits === 'mph' || savedUnits === 'kmh') unitSystem = savedUnits;
-} catch {}
-
 if (!navigator.bluetooth) {
   $('noBluetooth').hidden = false;
   $('btnConnect').disabled = true;
@@ -475,7 +470,6 @@ function syncStartSpeedPreference() {
 function setUnitSystem(nextUnits) {
   if (nextUnits === unitSystem) return;
   unitSystem = nextUnits;
-  try { localStorage.setItem('walkingpad-units', unitSystem); } catch {}
   renderUnitSystem();
 }
 

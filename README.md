@@ -10,7 +10,7 @@ The browser app connects straight to a treadmill through Web Bluetooth. It shows
 ## Features
 
 - Live speed, elapsed time, distance, and step count
-- mph/km/h display toggle, defaulting to mph
+- mph/km/h display toggle, starting in mph on every page load
 - Manual start, stop, and speed control from 0.0 to 3.7 mph (0.0 to 6.0 km/h)
 - Auto, manual, and standby modes
 - Max speed, start speed, sensor sensitivity, units, child lock, and auto-start preferences
